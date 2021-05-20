@@ -7,6 +7,7 @@ Flat, memory bound, k/v store based point-in-polygon alg. using geohash.
 import (
 	"github.com/mmcloughlin/geohash"
 	"math"
+	"sync"
 )
 
 // Extrema structure (Bounding Box)
@@ -266,4 +267,33 @@ func MakePolygonIndex(polygon [][][]float64, minp, maxp int) []string {
 	}
 
 	return total
+}
+
+// creates a polygon index given a polygon a min & max geohash precision
+// returns a string with all geohashs that are within the polygon.
+func MakePolygonIndex2(polygon [][][]float64, minp, maxp int) chan []string {
+	poly := CreatePolygon(polygon, minp, maxp)
+	// getting staritng geohashs
+	s_geohashs := GetStartingHashs(poly.Extrema, minp)
+
+	// iterating through starting geohashs
+	c := make(chan []string, 100)
+	wg := sync.WaitGroup{}
+	for _, ghash := range s_geohashs {
+		wg.Add(1)
+		go func(ghash string, c chan []string) {
+			defer wg.Done()
+			c <- poly.DrillGeohash(ghash, []string{})
+		}(ghash, c)
+	}
+	wg.Wait()
+	close(c)
+
+	return c
+	//total := []string{}
+	//for range s_geohashs {
+	//	total = append(total, <-c...)
+	//}
+	//
+	//return total
 }
