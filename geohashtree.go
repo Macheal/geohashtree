@@ -7,6 +7,7 @@ Flat, memory bound, k/v store based point-in-polygon alg. using geohash.
 import (
 	"github.com/mmcloughlin/geohash"
 	"math"
+	"sync"
 )
 
 // Extrema structure (Bounding Box)
@@ -86,7 +87,7 @@ type Poly struct {
 }
 
 // creates the polygon structure
-func CreatePolygon(polygon [][][]float64, minp, maxp int) *Poly {
+func CreatePolygon(polygon [][][]float64, maxp int) (*Poly, int) {
 	west, south, east, north := 180.0, 90.0, -180.0, -90.0
 	maxpmap := map[string]string{}
 	for _, cont := range polygon {
@@ -110,6 +111,8 @@ func CreatePolygon(polygon [][][]float64, minp, maxp int) *Poly {
 		}
 	}
 
+	// 算法调优公共级别下2级，效果更优
+	minp := getMinp(west, south, east, north) + 2
 	// logic for creating the smaller maps of each geohash
 	currentmap := maxpmap
 	totalmap := map[int]map[string]string{}
@@ -129,7 +132,24 @@ func CreatePolygon(polygon [][][]float64, minp, maxp int) *Poly {
 		Map:     totalmap,
 		Min:     minp,
 		Max:     maxp,
+	}, minp
+}
+
+// 获取最佳切分级别
+// 1. 取西南（minX，minY）和东北（maxX，maxY）2个坐标的对应的geohash
+// 2. 判定2个坐标所在第几级的划分下
+// 3. 由于算法
+func getMinp(west float64, south float64, east float64, north float64) int {
+	minp := 9
+
+	en := Geohash([]float64{east, north}, minp)
+	ws := Geohash([]float64{west, south}, minp)
+	for i := 0; i < len(en); i++ {
+		if en[i] != ws[i] {
+			return i
+		}
 	}
+	return 1
 }
 
 func (cont Poly) Pip(p []float64) bool {
@@ -249,21 +269,84 @@ func (poly *Poly) DrillGeohash(geohash string, newlist []string) []string {
 // creates a polygon index given a polygon a min & max geohash precision
 // returns a string with all geohashs that are within the polygon.
 func MakePolygonIndex(polygon [][][]float64, minp, maxp int) []string {
-	poly := CreatePolygon(polygon, minp, maxp)
+	ch := MakePolygonIndex2(polygon, maxp)
+	list := []string{}
+	for {
+		data, ok := <-ch
+		if !ok {
+			break
+		}
+		list = append(list, data)
+		//fmt.Println(data)
+	}
+	return list
+	//poly, minp := CreatePolygon(polygon, maxp)
+	//// getting staritng geohashs
+	//s_geohashs := GetStartingHashs(poly.Extrema, minp)
+	//
+	//// iterating through starting geohashs
+	//c := make(chan []string)
+	//for _, ghash := range s_geohashs {
+	//	go func(ghash string, c chan []string) {
+	//		c <- poly.DrillGeohash(ghash, []string{})
+	//	}(ghash, c)
+	//}
+	//total := []string{}
+	//for range s_geohashs {
+	//	total = append(total, <-c...)
+	//}
+	//
+	//return total
+}
+
+// creates a polygon index given a polygon a min & max geohash precision
+// returns a string with all geohashs that are within the polygon.
+func MakePolygonIndex2(polygon [][][]float64, maxp int) chan string {
+	poly, minp := CreatePolygon(polygon, maxp)
 	// getting staritng geohashs
 	s_geohashs := GetStartingHashs(poly.Extrema, minp)
 
 	// iterating through starting geohashs
-	c := make(chan []string)
-	for _, ghash := range s_geohashs {
-		go func(ghash string, c chan []string) {
-			c <- poly.DrillGeohash(ghash, []string{})
-		}(ghash, c)
-	}
-	total := []string{}
-	for range s_geohashs {
-		total = append(total, <-c...)
-	}
+	c := make(chan string, 100)
+	go func() {
+		defer close(c)
+		wg := sync.WaitGroup{}
+		for _, ghash := range s_geohashs {
+			wg.Add(1)
+			go func(ghash string, c chan string) {
+				defer wg.Done()
+				for _, str := range poly.DrillGeohash(ghash, []string{}) {
+					if len(str) < maxp {
+						list := []string{}
+						ExpandGeohashLv(str, maxp, &list)
+						for _, s := range list {
+							c <- s
+						}
+					} else {
+						c <- str
+					}
+				}
+			}(ghash, c)
+		}
+		wg.Wait()
+	}()
+	return c
 
-	return total
+}
+
+func ExpandGeohashLv(geohash string, maxp int, list *[]string) {
+	geoLen := len(geohash)
+	if geoLen > maxp {
+		return
+	}
+	if geoLen == maxp-1 {
+		*list = append(*list, ExpandGeohash(geohash)...)
+		return
+	}
+	next := ExpandGeohash(geohash)
+	if len(geohash) < maxp-1 {
+		for _, s := range next {
+			ExpandGeohashLv(s, maxp, list)
+		}
+	}
 }

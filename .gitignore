@@ -1,0 +1,44 @@
+# Binaries for programs and plugins
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Test binary, build with `go test -c`
+*.test
+
+# Output of the go coverage tool, specifically when used with LiteIDE
+*.out
+
+# Project-local glide cache, RE: https://github.com/Masterminds/glide/issues/736
+.glide/
+
+#goland
+.idea/
+
+#cache
+.cache/
+
+*.DS_Store
+bin/
+pkg/
+src/github.com/
+src/golang.org/
+src/gitee.com/
+Public/
+
+# ignore vendor
+/vendor/*
+
+# don't ignore vendor.json
+!src/RTSS/vendor/vendor.json
+
+src/RTSS/WebServices/WebAPI/swagger
+**/data
+**/lijiang
+logs/
+src/logs/
+lastupdate.tmp
+commentsRouter__*
+/cmd/local_scv/publish/
+/cmd/web/public/
