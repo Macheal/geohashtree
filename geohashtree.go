@@ -269,7 +269,7 @@ func (poly *Poly) DrillGeohash(geohash string, newlist []string) []string {
 // creates a polygon index given a polygon a min & max geohash precision
 // returns a string with all geohashs that are within the polygon.
 func MakePolygonIndex(polygon [][][]float64, minp, maxp int) []string {
-	ch := MakePolygonIndex2(polygon, maxp)
+	ch := MakePolygonIndex2(polygon, minp, maxp)
 	list := []string{}
 	for {
 		data, ok := <-ch
@@ -301,8 +301,13 @@ func MakePolygonIndex(polygon [][][]float64, minp, maxp int) []string {
 
 // creates a polygon index given a polygon a min & max geohash precision
 // returns a string with all geohashs that are within the polygon.
-func MakePolygonIndex2(polygon [][][]float64, maxp int) chan string {
-	poly, minp := CreatePolygon(polygon, maxp)
+func MakePolygonIndex2(polygon [][][]float64, minp, maxp int) chan string {
+	poly, _minp := CreatePolygon(polygon, maxp)
+	needExpand := false
+	if minp == 0 {
+		needExpand = true
+		minp = _minp
+	}
 	// getting staritng geohashs
 	s_geohashs := GetStartingHashs(poly.Extrema, minp)
 
@@ -317,10 +322,14 @@ func MakePolygonIndex2(polygon [][][]float64, maxp int) chan string {
 				defer wg.Done()
 				for _, str := range poly.DrillGeohash(ghash, []string{}) {
 					if len(str) < maxp {
-						list := []string{}
-						ExpandGeohashLv(str, maxp, &list)
-						for _, s := range list {
-							c <- s
+						if needExpand {
+							list := []string{}
+							ExpandGeohashLv(str, maxp, &list)
+							for _, s := range list {
+								c <- s
+							}
+						} else {
+							c <- str
 						}
 					} else {
 						c <- str
