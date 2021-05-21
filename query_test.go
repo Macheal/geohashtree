@@ -55,13 +55,23 @@ func TestGetGeoHashByLocalID(t *testing.T) {
 
 	geoStr := `{"type":"Feature","properties":{},"geometry":{"type":"Polygon","coordinates":[[[116.31362915039061,39.99500778093748],[116.22024536132811,39.86758762451019],[116.38092041015625,39.768436410838426],[116.53060913085936,39.86600654754002],[116.4715576171875,39.996585880995035],[116.31362915039061,39.99500778093748]]]}}`
 	feature, _ := geojson.UnmarshalFeature([]byte(geoStr))
-	ch := MakePolygonIndex2(feature.Geometry.Polygon, 5, 7)
-
+	ch := MakePolygonIndex2(feature.Geometry.Polygon, 7)
+	i := 0
 	for {
-		data, ok := <-ch
+
+		_, ok := <-ch
 		if !ok {
 			break
 		}
-		fmt.Println(data)
+		i++
+		//fmt.Println(data)
 	}
+	fmt.Println(i)
+}
+
+func TestA(t *testing.T) {
+	list := []string{}
+	ExpandGeohashLv("wx4dx", 7, &list)
+	fmt.Println(len(list))
+	fmt.Println(list)
 }
