@@ -1,4 +1,4 @@
-module github.com/geohashtree
+module github.com/macheal/geohashtree
 
 go 1.15
 
