@@ -302,7 +302,17 @@ func MakePolygonIndex(polygon [][][]float64, minp, maxp int) []string {
 // creates a polygon index given a polygon a min & max geohash precision
 // returns a string with all geohashs that are within the polygon.
 func MakePolygonIndex2(polygon [][][]float64, minp, maxp int) chan string {
+	c := make(chan string, 100)
 	poly, _minp := CreatePolygon(polygon, maxp)
+	if _minp > maxp {
+		go func(p *Poly) {
+			defer close(c)
+			for i, _ := range p.Map[maxp] {
+				c <- i
+			}
+		}(poly)
+		return c
+	}
 	needExpand := false
 	if minp == 0 {
 		needExpand = true
@@ -312,7 +322,6 @@ func MakePolygonIndex2(polygon [][][]float64, minp, maxp int) chan string {
 	s_geohashs := GetStartingHashs(poly.Extrema, minp)
 
 	// iterating through starting geohashs
-	c := make(chan string, 100)
 	go func() {
 		defer close(c)
 		wg := sync.WaitGroup{}
