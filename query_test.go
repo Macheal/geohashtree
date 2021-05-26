@@ -75,3 +75,9 @@ func TestA(t *testing.T) {
 	fmt.Println(len(list))
 	fmt.Println(list)
 }
+
+func TestGeohash(t *testing.T) {
+	en := Geohash([]float64{116.097078323364, 39.9063949275062}, 7)
+	fmt.Println(en)
+
+}

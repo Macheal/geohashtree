@@ -352,6 +352,21 @@ func MakePolygonIndex2(polygon [][][]float64, minp, maxp int) chan string {
 
 }
 
+func MakePolygonIndexCenter(polygon [][][]float64, minp, maxp int) chan []float64 {
+	result := make(chan []float64, 100)
+	go func(rch chan []float64) {
+		ch := MakePolygonIndex2(polygon, minp, maxp)
+		for {
+			data, ok := <-ch
+			if !ok {
+				break
+			}
+			rch <- Middle(data)
+		}
+		close(rch)
+	}(result)
+	return result
+}
 func ExpandGeohashLv(geohash string, maxp int, list *[]string) {
 	geoLen := len(geohash)
 	if geoLen > maxp {
