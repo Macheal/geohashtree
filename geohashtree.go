@@ -335,7 +335,7 @@ func MakePolygonIndex2(polygon [][][]float64, minp, maxp int, isIntersects bool)
 	//}
 	needExpand := false
 	if minp == 0 {
-		//needExpand = true
+		needExpand = true
 		minp = _minp
 	}
 	// getting staritng geohashs
