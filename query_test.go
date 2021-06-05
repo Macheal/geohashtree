@@ -49,7 +49,6 @@ func BenchmarkGetBoltDB(b *testing.B) {
 }
 
 func TestGetGeoHashByLocalID(t *testing.T) {
-	//geoStr := `{"geometry":{"type":"Polygon","coordinates":[[[116.097078323364,39.9063949275062],[116.095721125603,39.9056912570992],[116.095780134201,39.9048353207799],[116.097319722176,39.9048682416052],[116.097512841225,39.906209751784],[116.097078323364,39.9063949275062]]]}}`
 	// 西单包含1
 	geoStr := `{"type":"Feature","properties":{"name":"西单包含1"},"geometry":{"type":"Polygon","coordinates":[[[116.36568936571976,39.91078430057894],[116.36564672504748,39.90917557613217],[116.36860315259116,39.90923745908074],[116.36837800260822,39.91075601393454],[116.36568936571976,39.91078430057894]]]}}`
 	//geoStr := `{"type":"Feature","properties":{"name":"永定政府"},"geometry":{"type":"Polygon","coordinates":[[[116.097078323364,39.9063949275062],[116.095721125603,39.9056912570992],[116.095780134201,39.9048353207799],[116.097319722176,39.9048682416052],[116.097512841225,39.906209751784],[116.097078323364,39.9063949275062]]]}}`
@@ -57,7 +56,7 @@ func TestGetGeoHashByLocalID(t *testing.T) {
 
 	//geoStr := `{"type":"Feature","properties":{},"geometry":{"type":"Polygon","coordinates":[[[116.31362915039061,39.99500778093748],[116.22024536132811,39.86758762451019],[116.38092041015625,39.768436410838426],[116.53060913085936,39.86600654754002],[116.4715576171875,39.996585880995035],[116.31362915039061,39.99500778093748]]]}}`
 	feature, _ := geojson.UnmarshalFeature([]byte(geoStr))
-	ch := MakePolygonIndex2(feature.Geometry.Polygon, 0, 7, true)
+	ch := MakePolygonIndex2(feature.Geometry.Polygon, 0, 7, false)
 	i := 0
 	mapR := make(map[string]byte)
 	for {
@@ -73,6 +72,7 @@ func TestGetGeoHashByLocalID(t *testing.T) {
 	for k, _ := range mapR {
 		fmt.Println(k)
 	}
+	fmt.Println("maps:", len(mapR))
 	fmt.Println("count:", i)
 }
 
