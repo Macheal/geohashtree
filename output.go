@@ -70,14 +70,14 @@ func (output *IndexOutput) AddFeature(feature *geojson.Feature, field string) st
 	output.TotalPolygons++
 	if feature.Geometry.Type == "Polygon" {
 		return CleanOutput(
-			MakePolygonIndex(feature.Geometry.Polygon, output.Min, output.Max),
+			MakePolygonIndex(feature.Geometry.Polygon, output.Min, output.Max, false),
 			valstr,
 			output.Min,
 		)
 	} else if feature.Geometry.Type == "MultiPolygon" {
 		totaloutput := []string{}
 		for _, polygon := range feature.Geometry.MultiPolygon {
-			totaloutput = append(totaloutput, MakePolygonIndex(polygon, output.Min, output.Max)...)
+			totaloutput = append(totaloutput, MakePolygonIndex(polygon, output.Min, output.Max, false)...)
 		}
 		return CleanOutput(totaloutput, valstr, output.Min)
 	}

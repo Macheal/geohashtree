@@ -125,6 +125,9 @@ func CreatePolygon(polygon [][][]float64, maxp int) (*Poly, int) {
 		totalmap[i] = newmap
 		currentmap = newmap
 	}
+	if minp > maxp {
+		minp = maxp
+	}
 
 	return &Poly{
 		Polygon: polygon,
@@ -187,15 +190,25 @@ func (cont Poly) Pip(p []float64) bool {
 			if curr[0] != next[0] && p[0] > xint {
 				continue
 			}
+			//curr:= x1,y1
+			//next:= x2,y2
+			//p:= x0,y0
+			//
+			//xint:=(y0-y1)*(x2-x1)/(y2-y1) +x1
+			//if x1 != x2 && x0 >xint{
+			//	非内部点
+			//}
 
 			intersections++
 		}
 	}
 
+	// 奇数 为true(内部)
 	return intersections%2 != 0
 }
 
 // gettting a hard point in polygon
+// res: 1:within , 2:part within , 3:out
 func (polygon Poly) HardPip(geohash string) int {
 	size := len(geohash)
 	_, boolval := polygon.Map[size][geohash]
@@ -204,6 +217,7 @@ func (polygon Poly) HardPip(geohash string) int {
 	}
 	count := 0
 	bds := GetExtrema(geohash)
+	// 获取geohash，4个顶点
 	pts := [][]float64{{bds.W, bds.N}, {bds.E, bds.N}, {bds.E, bds.S}, {bds.W, bds.S}} // wn,en,es,ws
 	for _, i := range pts {
 		if polygon.Pip(i) {
@@ -211,14 +225,14 @@ func (polygon Poly) HardPip(geohash string) int {
 		}
 	}
 
-	// if within
+	// if within ： 4个顶点，都在圈内 = 包含
 	if count == len(pts) {
 		return 1
 	} else if count > 0 {
-		// part within
+		// part within ： 4个顶点， 有在圈内，但不是4个 = 部分包含
 		return 2
 	} else {
-		// out
+		// out ： 4个顶点，都不在圈内 = 外部
 		return 3
 	}
 
@@ -226,7 +240,7 @@ func (polygon Poly) HardPip(geohash string) int {
 }
 
 // drills a single geohash to the maximum precision
-func (poly *Poly) DrillGeohash(geohash string, newlist []string) []string {
+func (poly *Poly) DrillGeohash(geohash string, maxp int, isIntersects bool, newlist []string) []string {
 	// creating channel
 	c := make(chan []string)
 
@@ -235,6 +249,8 @@ func (poly *Poly) DrillGeohash(geohash string, newlist []string) []string {
 	if poly.Min == len(geohash) {
 		hardpip := poly.HardPip(geohash)
 		if hardpip == 1 {
+			return append(newlist, geohash)
+		} else if hardpip == 2 && isIntersects && len(geohash) == maxp {
 			return append(newlist, geohash)
 		}
 	}
@@ -247,7 +263,11 @@ func (poly *Poly) DrillGeohash(geohash string, newlist []string) []string {
 				if hardpip == 1 {
 					c <- []string{newgeohash}
 				} else if hardpip == 2 {
-					c <- poly.DrillGeohash(newgeohash, []string{})
+					if isIntersects && len(newgeohash) == maxp {
+						c <- []string{newgeohash}
+					}
+					list := poly.DrillGeohash(newgeohash, maxp, isIntersects, []string{})
+					c <- list
 				} else {
 					c <- []string{}
 				}
@@ -268,8 +288,8 @@ func (poly *Poly) DrillGeohash(geohash string, newlist []string) []string {
 
 // creates a polygon index given a polygon a min & max geohash precision
 // returns a string with all geohashs that are within the polygon.
-func MakePolygonIndex(polygon [][][]float64, minp, maxp int) []string {
-	ch := MakePolygonIndex2(polygon, minp, maxp)
+func MakePolygonIndex(polygon [][][]float64, minp, maxp int, isIntersects bool) []string {
+	ch := MakePolygonIndex2(polygon, minp, maxp, isIntersects)
 	list := []string{}
 	for {
 		data, ok := <-ch
@@ -301,24 +321,27 @@ func MakePolygonIndex(polygon [][][]float64, minp, maxp int) []string {
 
 // creates a polygon index given a polygon a min & max geohash precision
 // returns a string with all geohashs that are within the polygon.
-func MakePolygonIndex2(polygon [][][]float64, minp, maxp int) chan string {
+func MakePolygonIndex2(polygon [][][]float64, minp, maxp int, isIntersects bool) chan string {
 	c := make(chan string, 100)
 	poly, _minp := CreatePolygon(polygon, maxp)
-	if _minp > maxp {
-		go func(p *Poly) {
-			defer close(c)
-			for i, _ := range p.Map[maxp] {
-				c <- i
-			}
-		}(poly)
-		return c
-	}
+	//if _minp > maxp {
+	//	go func(p *Poly) {
+	//		defer close(c)
+	//		for i, _ := range p.Map[maxp] {
+	//			c <- i
+	//		}
+	//	}(poly)
+	//	return c
+	//}
 	needExpand := false
 	if minp == 0 {
-		needExpand = true
+		//needExpand = true
 		minp = _minp
 	}
 	// getting staritng geohashs
+	//if minp>maxp{
+	//	minp = maxp
+	//}
 	s_geohashs := GetStartingHashs(poly.Extrema, minp)
 
 	// iterating through starting geohashs
@@ -327,9 +350,9 @@ func MakePolygonIndex2(polygon [][][]float64, minp, maxp int) chan string {
 		wg := sync.WaitGroup{}
 		for _, ghash := range s_geohashs {
 			wg.Add(1)
-			go func(ghash string, c chan string) {
-				defer wg.Done()
-				for _, str := range poly.DrillGeohash(ghash, []string{}) {
+			go func(ghash string, c chan string, g *sync.WaitGroup) {
+				defer g.Done()
+				for _, str := range poly.DrillGeohash(ghash, maxp, isIntersects, []string{}) {
 					if len(str) < maxp {
 						if needExpand {
 							list := []string{}
@@ -344,7 +367,7 @@ func MakePolygonIndex2(polygon [][][]float64, minp, maxp int) chan string {
 						c <- str
 					}
 				}
-			}(ghash, c)
+			}(ghash, c, &wg)
 		}
 		wg.Wait()
 	}()
@@ -352,10 +375,10 @@ func MakePolygonIndex2(polygon [][][]float64, minp, maxp int) chan string {
 
 }
 
-func MakePolygonIndexCenter(polygon [][][]float64, minp, maxp int) chan []float64 {
+func MakePolygonIndexCenter(polygon [][][]float64, minp, maxp int, isIntersects bool) chan []float64 {
 	result := make(chan []float64, 100)
 	go func(rch chan []float64) {
-		ch := MakePolygonIndex2(polygon, minp, maxp)
+		ch := MakePolygonIndex2(polygon, minp, maxp, isIntersects)
 		for {
 			data, ok := <-ch
 			if !ok {
