@@ -44,6 +44,14 @@ func main() {
 	for _, ghash := range geohashs[:100] {
 		fmt.Println(ghash)
 	}
+
+
+    making a geohash tree of all 9 geohash
+	geohashs := geohashtree.MakePolygonIndex(feature.Geometry.Polygon, 0, 9)
+
+	for _, ghash := range geohashs[:100] {
+		fmt.Println(ghash)
+	}
 }
 ```
 
